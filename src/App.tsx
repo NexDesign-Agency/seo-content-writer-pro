@@ -66,6 +66,7 @@ const TONE_OPTIONS = [
 ];
 
 const STORAGE_KEY = "seo-prompt-builder-state-v1";
+const PRESETS_KEY = "seo-prompt-builder-presets-v1";
 
 type FormState = {
   h1Title: string;
@@ -102,6 +103,13 @@ type PersistedState = {
   generatedPrompt: string;
 };
 
+type PresetItem = {
+  id: string;
+  name: string;
+  form: FormState;
+  updatedAt: string;
+};
+
 const loadPersistedState = (): PersistedState | null => {
   if (typeof window === "undefined") {
     return null;
@@ -124,6 +132,37 @@ const loadPersistedState = (): PersistedState | null => {
     };
   } catch {
     return null;
+  }
+};
+
+const loadPresets = (): PresetItem[] => {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(PRESETS_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as PresetItem[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((preset) => preset && typeof preset.name === "string" && preset.form)
+      .map((preset) => ({
+        ...preset,
+        id: typeof preset.id === "string" ? preset.id : `preset-${Date.now()}`,
+        name: preset.name.trim(),
+        form: { ...initialForm, ...preset.form },
+        updatedAt: typeof preset.updatedAt === "string" ? preset.updatedAt : new Date().toISOString(),
+      }))
+      .filter((preset) => preset.name.length > 0);
+  } catch {
+    return [];
   }
 };
 
@@ -221,12 +260,18 @@ E-E-A-T: data statistik, pengalaman brand, social proof
 
 INTERNAL LINKING (sisipkan natural):
 ${internalLinks}
+ATURAN INTERNAL LINK (WAJIB):
+- Gunakan hanya URL dari daftar internal link yang diberikan.
+- Jumlah internal link di kolom KONTEN wajib 5-10 link total.
+- Dilarang menghasilkan lebih dari 10 internal link.
+- Jika internal link kurang dari 5 atau lebih dari 10, revisi dulu output sebelum dikirim.
 
 CTA (sisipkan di 3 titik):
 1) Setelah section ke-2 (soft CTA)
 2) Tengah artikel (medium CTA)
 3) Akhir artikel (strong CTA)
 FAQ: minimal 5 FAQ dalam artikel
+Jumlah internal link yang dihasilkan: minimal 5 dan maksimal 10 link internal
 
 FORMAT OUTPUT (WAJIB IKUTI PERSIS!)
 ═══════════════════════════════════════════════════════════════
@@ -325,6 +370,7 @@ LARANGAN:
 - Jangan gunakan Markdown di kolom KONTEN
 - Jangan masukkan <h1> di kolom KONTEN
 - Jangan masukkan schema di kolom KONTEN
+- Jangan pakai internal link lebih dari 10 tautan di kolom KONTEN
 
 PLACEHOLDER INPUT:
 Judul H1: ${h1Title}
@@ -350,11 +396,19 @@ export default function App() {
   const [form, setForm] = useState<FormState>(() => loadPersistedState()?.form ?? initialForm);
   const [generatedPrompt, setGeneratedPrompt] = useState(() => loadPersistedState()?.generatedPrompt ?? "");
   const [copied, setCopied] = useState(false);
+  const [presets, setPresets] = useState<PresetItem[]>(() => loadPresets());
+  const [presetName, setPresetName] = useState("");
+  const [selectedPresetId, setSelectedPresetId] = useState("");
+  const [presetNotice, setPresetNotice] = useState("");
 
   useEffect(() => {
     const payload: PersistedState = { form, generatedPrompt };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }, [form, generatedPrompt]);
+
+  useEffect(() => {
+    window.localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+  }, [presets]);
 
   const homepageUrl = useMemo(() => detectHomepageUrl(form.targetUrl), [form.targetUrl]);
 
@@ -385,6 +439,79 @@ export default function App() {
     setForm((prev) => ({ ...prev, [field]: value }));
     setGeneratedPrompt("");
     setCopied(false);
+  };
+
+  const savePreset = () => {
+    const normalizedName = presetName.trim();
+    if (!normalizedName) {
+      setPresetNotice("Isi nama preset dulu.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    setPresets((prev) => {
+      const existing = prev.find((item) => item.name.toLowerCase() === normalizedName.toLowerCase());
+      if (existing) {
+        setSelectedPresetId(existing.id);
+        setPresetNotice(`Preset \"${normalizedName}\" berhasil di-update.`);
+        return prev.map((item) =>
+          item.id === existing.id
+            ? { ...item, name: normalizedName, form: { ...form }, updatedAt: now }
+            : item
+        );
+      }
+
+      const newPreset: PresetItem = {
+        id: `preset-${Date.now()}`,
+        name: normalizedName,
+        form: { ...form },
+        updatedAt: now,
+      };
+
+      setSelectedPresetId(newPreset.id);
+      setPresetNotice(`Preset \"${normalizedName}\" berhasil disimpan.`);
+      return [newPreset, ...prev];
+    });
+  };
+
+  const loadPresetById = () => {
+    if (!selectedPresetId) {
+      setPresetNotice("Pilih preset yang ingin di-load.");
+      return;
+    }
+
+    const selected = presets.find((item) => item.id === selectedPresetId);
+    if (!selected) {
+      setPresetNotice("Preset tidak ditemukan.");
+      return;
+    }
+
+    setForm({ ...initialForm, ...selected.form });
+    setGeneratedPrompt("");
+    setCopied(false);
+    setPresetName(selected.name);
+    setPresetNotice(`Preset \"${selected.name}\" berhasil di-load.`);
+  };
+
+  const deletePresetById = () => {
+    if (!selectedPresetId) {
+      setPresetNotice("Pilih preset yang ingin dihapus.");
+      return;
+    }
+
+    const selected = presets.find((item) => item.id === selectedPresetId);
+    if (!selected) {
+      setPresetNotice("Preset tidak ditemukan.");
+      return;
+    }
+
+    setPresets((prev) => prev.filter((item) => item.id !== selectedPresetId));
+    setSelectedPresetId("");
+    if (presetName.trim().toLowerCase() === selected.name.toLowerCase()) {
+      setPresetName("");
+    }
+    setPresetNotice(`Preset \"${selected.name}\" berhasil dihapus.`);
   };
 
   const resetToPlaceholder = () => {
@@ -460,6 +587,57 @@ export default function App() {
                   placeholder="(place holder)"
                 />
               </label>
+            </div>
+
+            <div className="space-y-3 rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
+              <p className="text-sm font-medium text-zinc-100">Preset Website</p>
+              <p className="text-xs text-zinc-400">
+                Simpan konfigurasi per website, lalu load kapan saja saat pindah project.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                <input
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400"
+                  value={presetName}
+                  onChange={(event) => setPresetName(event.target.value)}
+                  placeholder="Contoh: Website A - CCTVGO"
+                />
+                <button
+                  type="button"
+                  onClick={savePreset}
+                  className="rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-violet-400"
+                >
+                  Save Preset
+                </button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+                <select
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400"
+                  value={selectedPresetId}
+                  onChange={(event) => setSelectedPresetId(event.target.value)}
+                >
+                  <option value="">Pilih preset tersimpan</option>
+                  {presets.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={loadPresetById}
+                  className="rounded-md border border-emerald-500/60 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:border-emerald-400"
+                >
+                  Load Preset
+                </button>
+                <button
+                  type="button"
+                  onClick={deletePresetById}
+                  className="rounded-md border border-rose-500/60 px-4 py-2 text-sm font-medium text-rose-200 transition hover:border-rose-400"
+                >
+                  Hapus
+                </button>
+              </div>
+              {presetNotice && <p className="text-xs text-zinc-300">{presetNotice}</p>}
             </div>
 
             <div className="space-y-2 text-sm">
@@ -626,7 +804,7 @@ export default function App() {
                 onClick={resetToPlaceholder}
                 className="rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-400"
               >
-                Reset
+                Reset Form
               </button>
             </div>
           </form>
