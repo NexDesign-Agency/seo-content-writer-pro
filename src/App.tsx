@@ -81,6 +81,7 @@ type FormState = {
   parentUrl: string;
   parentVisual: string;
   internalLinks: string;
+  breadcrumbOverride: string;
 };
 
 const initialForm: FormState = {
@@ -96,6 +97,7 @@ const initialForm: FormState = {
   parentUrl: "https://cctvgo.id/area/",
   parentVisual: "Area Layanan",
   internalLinks: DEFAULT_INTERNAL_LINKS,
+  breadcrumbOverride: "",
 };
 
 type PersistedState = {
@@ -218,6 +220,7 @@ const buildPrompt = (form: FormState, homepageUrl: string) => {
   const internalLinks = cleanLinks(form.internalLinks) || "(place holder)";
   const homepageBase = resolvedHomepageUrl === "(place holder)" ? "(place holder)" : resolvedHomepageUrl.replace(/\/$/, "");
   const articleSlug = createSlug(h1Title);
+  const breadcrumbText = form.breadcrumbOverride.trim() || `BERANDA > ${parentVisual} > ${h1Title}`;
 
   return `BUATKAN OUTPUT SESUAI RULES BERIKUT.
 
@@ -385,11 +388,11 @@ Niche / Industri: ${niche}
 Konten Homepage: ${homepageContent}
 
 BREADCRUMB:
-BERANDA > ${parentVisual} > ${h1Title}
+${breadcrumbText}
 URL PARENT 1 = ${parentUrl}
 PARENT 1 VISUAL = ${parentVisual}
 JUDUL H1 (otomatis dari h1) = ${h1Title}
-Contoh output: Home > ${parentVisual} > ${h1Title}`;
+Contoh output: ${breadcrumbText}`;
 };
 
 export default function App() {
@@ -575,7 +578,7 @@ export default function App() {
                   className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
                   value={form.h1Title}
                   onChange={(event) => updateField("h1Title", event.target.value)}
-                  placeholder="(place holder)"
+                  placeholder="Contoh: Jasa Pasang CCTV Jakarta"
                 />
               </label>
               <label className="space-y-2 text-sm">
@@ -584,7 +587,7 @@ export default function App() {
                   className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
                   value={form.focusKeyword}
                   onChange={(event) => updateField("focusKeyword", event.target.value)}
-                  placeholder="(place holder)"
+                  placeholder="Contoh: pasang cctv jakarta"
                 />
               </label>
             </div>
@@ -707,7 +710,7 @@ export default function App() {
                   className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
                   value={form.targetUrl}
                   onChange={(event) => updateField("targetUrl", event.target.value)}
-                  placeholder="(place holder)"
+                  placeholder="https://cctvgo.id/jasa-pasang-cctv-jakarta/"
                 />
               </label>
               <label className="space-y-2 text-sm">
@@ -727,7 +730,7 @@ export default function App() {
                   className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
                   value={form.brandName}
                   onChange={(event) => updateField("brandName", event.target.value)}
-                  placeholder="(place holder)"
+                  placeholder="Nama Bisnis / Brand"
                 />
               </label>
               <label className="space-y-2 text-sm">
@@ -736,7 +739,7 @@ export default function App() {
                   className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
                   value={form.niche}
                   onChange={(event) => updateField("niche", event.target.value)}
-                  placeholder="(place holder)"
+                  placeholder="Contoh: Keamanan, CCTV, IT"
                 />
               </label>
             </div>
@@ -748,6 +751,7 @@ export default function App() {
                   className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
                   value={form.parentUrl}
                   onChange={(event) => updateField("parentUrl", event.target.value)}
+                  placeholder="https://client-web.com/category/"
                 />
               </label>
               <label className="space-y-2 text-sm">
@@ -756,13 +760,19 @@ export default function App() {
                   className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
                   value={form.parentVisual}
                   onChange={(event) => updateField("parentVisual", event.target.value)}
+                  placeholder="Contoh: Area Layanan"
                 />
               </label>
             </div>
 
-            <div className="rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-sm">
-              <p className="text-zinc-400">Preview Breadcrumb</p>
-              <p className="mt-1 text-zinc-100">{breadcrumbPreview}</p>
+            <div className="space-y-2">
+              <p className="text-sm">Preview Breadcrumb (Bisa diedit manual)</p>
+              <input
+                className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-cyan-200 outline-none transition focus:border-cyan-400"
+                value={form.breadcrumbOverride || breadcrumbPreview}
+                onChange={(event) => updateField("breadcrumbOverride", event.target.value)}
+                placeholder={breadcrumbPreview}
+              />
             </div>
 
             <label className="block space-y-2 text-sm">
@@ -771,7 +781,7 @@ export default function App() {
                 className="min-h-56 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400"
                 value={form.homepageContent}
                 onChange={(event) => updateField("homepageContent", event.target.value)}
-                placeholder="(place holder)"
+                placeholder="Paste konten halaman utama atau konteks bisnis di sini..."
               />
             </label>
 
