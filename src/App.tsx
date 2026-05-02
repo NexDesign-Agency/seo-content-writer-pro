@@ -1,59 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
-const DEFAULT_HOMEPAGE_CONTENT = `Layanan pengepul minyak jelantah khusus Jakarta dengan:
-Harga tinggi: Rp 6.500 - 8.000/liter
-Express same day: booking pagi, jemput siang
-Bayar langsung di tempat (cash / transfer)
-No PHP (100% on time)
-Harga:
-20-200L -> Rp 6.500/L
-201-500L -> Rp 7.000/L
-500L+ -> Rp 8.000/L
-Keunggulan Utama:
-Express service: datang 30-60 menit (Jakarta)
-Harga lebih tinggi: karena fokus area (cost lebih rendah)
-Transparan: timbangan digital, tanpa potongan
-Repeat order tinggi: 900+ customer
-On time 100% (No PHP)
-Area Layanan:
-Seluruh DKI Jakarta (5 wilayah)
-Tidak melayani luar Jakarta (Tangerang, Bekasi, dll)
-Cara Kerja (3 Step):
-Chat WhatsApp (info lokasi & volume)
-Tim datang & timbang
-Dibayar langsung di tempat
-Total proses: 1-3 jam
-Target Customer:
-Restoran, warteg, catering, kafe
-Rumah tangga & komunitas
-Pengepul kecil / reseller
-Positioning vs Kompetitor:
-Lebih cepat (same day vs 1-2 hari)
-Lebih tepat waktu
-Minimal volume lebih kecil (20L)
-Fokus Jakarta -> service lebih optimal
-Insight Strategi:
-Core angle: "Fokus Jakarta = lebih cepat + harga lebih tinggi"
-Differentiator kuat: No PHP + same day
-Trust builder: angka nyata (900+ customer, 1.5 juta liter)`;
-
-const DEFAULT_INTERNAL_LINKS = `https://cctvgo.id/
-https://cctvgo.id/harga-jasa-pasang-cctv-jakarta/
-https://cctvgo.id/jasa-pasang-cctv-jakarta-pusat/
-https://cctvgo.id/jasa-pasang-cctv-jakarta-barat/
-https://cctvgo.id/jasa-pasang-cctv-jakarta-selatan/
-https://cctvgo.id/jasa-pasang-cctv-jakarta-utara/
-https://cctvgo.id/jasa-pasang-cctv-jakarta-timur/
-https://cctvgo.id/area/
-https://cctvgo.id/jasa-pasang-cctv/
-https://cctvgo.id/panduan-lengkap-cctv/
-https://cctvgo.id/rekomendasi-review-cctv/
-https://cctvgo.id/tentang-kami/
-https://cctvgo.id/kontak/
-https://cctvgo.id/jasa-pasang-cctv-depok/
-https://cctvgo.id/jasa-pasang-cctv-bogor/
-https://cctvgo.id/jasa-pasang-cctv-bekasi/
-https://cctvgo.id/jasa-pasang-cctv-tangerang/`;
+const DEFAULT_HOMEPAGE_CONTENT = "";
+const DEFAULT_INTERNAL_LINKS = "";
 
 const CONTENT_TYPES = ["PILAR", "BLOG", "SERVICE", "LOCAL SEO", "LANDING PAGE"];
 const WORD_COUNT_OPTIONS = ["800-1200", "1200-1800", "1800-2500", "2500-3500"];
@@ -63,6 +11,7 @@ const TONE_OPTIONS = [
   "Formal Korporat",
   "Santai Persuasif",
   "Data-driven Expert",
+  "Conversational Yet Authoritative",
 ];
 
 const STORAGE_KEY = "seo-prompt-builder-state-v1";
@@ -77,6 +26,7 @@ type FormState = {
   tone: string;
   brandName: string;
   niche: string;
+  ctaTarget: string;
   homepageContent: string;
   parentUrl: string;
   parentVisual: string;
@@ -93,9 +43,10 @@ const initialForm: FormState = {
   tone: "Profesional & Terpercaya",
   brandName: "",
   niche: "",
+  ctaTarget: "",
   homepageContent: DEFAULT_HOMEPAGE_CONTENT,
-  parentUrl: "https://cctvgo.id/area/",
-  parentVisual: "Area Layanan",
+  parentUrl: "",
+  parentVisual: "",
   internalLinks: DEFAULT_INTERNAL_LINKS,
   breadcrumbOverride: "",
 };
@@ -113,21 +64,12 @@ type PresetItem = {
 };
 
 const loadPersistedState = (): PersistedState | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
+  if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
-    if (!parsed.form) {
-      return null;
-    }
-
+    if (!parsed.form) return null;
     return {
       form: { ...initialForm, ...parsed.form },
       generatedPrompt: typeof parsed.generatedPrompt === "string" ? parsed.generatedPrompt : "",
@@ -138,21 +80,12 @@ const loadPersistedState = (): PersistedState | null => {
 };
 
 const loadPresets = (): PresetItem[] => {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
+  if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(PRESETS_KEY);
-    if (!raw) {
-      return [];
-    }
-
+    if (!raw) return [];
     const parsed = JSON.parse(raw) as PresetItem[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
+    if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((preset) => preset && typeof preset.name === "string" && preset.form)
       .map((preset) => ({
@@ -174,20 +107,12 @@ const resolveValue = (value: string, fallback = "(place holder)") => {
 };
 
 const cleanLinks = (rawLinks: string) =>
-  rawLinks
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .join("\n");
+  rawLinks.split("\n").map((line) => line.trim()).filter(Boolean).join("\n");
 
 const detectHomepageUrl = (targetUrl: string) => {
   const trimmed = targetUrl.trim();
-  if (!trimmed) {
-    return "";
-  }
-
+  if (!trimmed) return "";
   const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-
   try {
     const parsedUrl = new URL(normalized);
     return `${parsedUrl.protocol}//${parsedUrl.host}/`;
@@ -197,12 +122,44 @@ const detectHomepageUrl = (targetUrl: string) => {
 };
 
 const createSlug = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-") || "prompt-artikel";
+  value.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-").replace(/-+/g, "-") || "prompt-artikel";
+
+const CONVERSATIONAL_TONE_RULES = `
+ATURAN TONE & RITME KHUSUS — CONVERSATIONAL YET AUTHORITATIVE:
+═══════════════════════════════════════════════════════════════
+Tone: Bicara seperti teman yang pintar dan berpengalaman.
+Bukan menggurui. Bukan korporat. Tapi tetap dipercaya.
+
+Ritme (WAJIB diterapkan di setiap paragraf):
+- Campur kalimat panjang dan pendek secara sadar.
+- Gunakan kalimat satu baris untuk penekanan poin penting.
+- Setelah 2-3 kalimat panjang, selipkan 1 kalimat pendek yang menghantam.
+- Biarkan ada "jeda napas" — paragraf pendek 1-2 kalimat setelah blok panjang.
+
+Contoh ritme SALAH (monoton):
+"Penampung tangan pertama membayar lebih tinggi karena mereka langsung terhubung dengan pabrik biodiesel tanpa perantara. Hal ini menyebabkan margin yang lebih baik untuk penjual."
+
+Contoh ritme BENAR (bernyawa):
+"Penampung tangan pertama langsung terhubung ke pabrik biodiesel. Tidak ada perantara. Tidak ada potongan di tengah.
+Hasilnya? Harga yang kamu terima jauh lebih tinggi."
+
+Aturan tambahan:
+- Gunakan "kamu" bukan "Anda" untuk kesan akrab
+- Boleh mulai kalimat dengan "Dan", "Tapi", "Karena" untuk efek ritme
+- Angka dan fakta harus diikuti dampaknya langsung (jangan biarkan data mengambang)
+- Hindari kata-kata: "merupakan", "tersebut", "dalam rangka", "sehubungan dengan"
+- Hindari pembuka generik: "Dalam era modern ini...", "Tidak dapat dipungkiri..."
+- Setiap section harus punya 1 kalimat yang "menghantam" — pendek, tajam, berkesan
+`;
+
+const getISODate = () => {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const yyyy = now.getFullYear();
+  const mm = pad(now.getMonth() + 1);
+  const dd = pad(now.getDate());
+  return `${yyyy}-${mm}-${dd}T08:00:00+07:00`;
+};
 
 const buildPrompt = (form: FormState, homepageUrl: string) => {
   const h1Title = resolveValue(form.h1Title);
@@ -214,25 +171,31 @@ const buildPrompt = (form: FormState, homepageUrl: string) => {
   const tone = resolveValue(form.tone);
   const brandName = resolveValue(form.brandName);
   const niche = resolveValue(form.niche);
-  const parentUrl = resolveValue(form.parentUrl);
-  const parentVisual = resolveValue(form.parentVisual);
+  const parentUrl = form.parentUrl.trim();
+  const parentVisual = form.parentVisual.trim();
+  const hasParent = parentVisual.length > 0 && parentVisual !== ">" && parentUrl.length > 0;
   const homepageContent = resolveValue(form.homepageContent, "(place holder)");
   const internalLinks = cleanLinks(form.internalLinks) || "(place holder)";
   const homepageBase = resolvedHomepageUrl === "(place holder)" ? "(place holder)" : resolvedHomepageUrl.replace(/\/$/, "");
   const articleSlug = createSlug(h1Title);
-  const breadcrumbText = form.breadcrumbOverride.trim() || `BERANDA > ${parentVisual} > ${h1Title}`;
+  const breadcrumbText = form.breadcrumbOverride.trim() || (hasParent ? `BERANDA > ${parentVisual} > ${h1Title}` : `BERANDA > ${h1Title}`);
+  const conversationalRules = tone === "Conversational Yet Authoritative" ? CONVERSATIONAL_TONE_RULES : "";
+  const ctaTarget = resolveValue(form.ctaTarget);
+  const isoDate = getISODate();
 
-  return `BUATKAN OUTPUT SESUAI RULES BERIKUT.
+  return `PENTING: Langsung output tabel tanpa teks pembuka, penjelasan, atau penutup apapun. Mulai langsung dari header tabel.
 
-KONTEN HOMEPAGE UNTUK ANALISIS:
+BUATKAN OUTPUT SESUAI RULES BERIKUT.
+
+STEP 1 — KONTEKS BISNIS & HOMEPAGE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${homepageContent}
-Gunakan semua informasi di atas sebagai konteks untuk artikel.
 Nama Brand / Perusahaan: ${brandName}
 Niche / Industri: ${niche}
 Homepage URL: ${resolvedHomepageUrl}
+CTA Target (nomor WA / URL tujuan): ${ctaTarget}
 
-STEP 2: SEO CONTENT BRIEF
+STEP 2 — SEO CONTENT BRIEF:
 ═══════════════════════════════════════════════════════════════
 BRIEF KONTEN:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -242,10 +205,10 @@ Tipe Konten : ${contentType}
 Brand : ${brandName}
 Niche : ${niche}
 Target URL : ${targetUrl}
-Jumlah Kata : ${wordCount} (toleransi +/-100 kata)
+Jumlah Kata : ${wordCount} kata (WAJIB. Hitung sebelum output. Jika kurang dari batas bawah, tambahkan section baru sampai tercapai. Jangan kirim output jika word count belum terpenuhi.)
 Tone / Gaya : ${tone}
 Bahasa : Bahasa Indonesia
-
+${conversationalRules}
 SEO ON-PAGE RULES (WAJIB DIIKUTI!)
 ═══════════════════════════════════════════════════════════════
 TITLE TAG: 50-60 karakter, fokus keyword di awal
@@ -283,6 +246,7 @@ ATURAN OUTPUT MUTLAK:
 - Tidak ada teks pembuka, penjelasan, atau penutup
 - Langsung mulai dengan header tabel
 - Kolom KONTEN wajib HTML (bukan Markdown)
+- Word count kolom KONTEN WAJIB sesuai brief. Hitung ulang jika ragu. Tambah section baru jika masih kurang.
 
 STRUKTUR TABEL OUTPUT:
 POST TITLE | Meta Description | URL Slug | Focus Keyword | breadcrumb_html | JUDUL ARTIKEL | KONTEN | IMAGE URL | ALT TEXT
@@ -292,77 +256,56 @@ PANDUAN KOLOM:
 2) Meta Description: 150-160 karakter, keyword + CTA
 3) URL Slug: lowercase, hyphen, tanpa domain, tanpa trailing slash
 4) Focus Keyword: keyword utama
-5) breadcrumb_html: gabungan visual breadcrumb + schema JSON-LD format @graph, satu baris tanpa line break
-   WAJIB berisi 3 schema di dalam @graph: BreadcrumbList + Article + FAQPage.
-   Gunakan struktur Article berikut di dalam @graph dan WAJIB tambahkan field name + url di author dan publisher:
+5) breadcrumb_html: GABUNGAN 3 bagian berikut, semua dijadikan SATU BARIS (minify, tanpa line break, tanpa spasi berlebih):
+
+   BAGIAN A — CSS (minify jadi satu baris):
+   <style>.breadcrumb-nav{background:#f8f9fa;padding:8px 12px;border-radius:6px;margin:12px 0;border-left:3px solid #27ae60}.breadcrumb{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:.85em}.breadcrumb li{display:inline}.breadcrumb a{color:#3498db;text-decoration:none;transition:color .3s}.breadcrumb a:hover{color:#27ae60;text-decoration:underline}.breadcrumb-separator{color:#999;font-weight:700;user-select:none}.breadcrumb .active{color:#2c3e50;font-weight:600}@media(max-width:768px){.breadcrumb{font-size:.78em}.breadcrumb-nav{padding:6px 10px;margin:8px 0}}</style>
+
+   BAGIAN B — HTML Nav (minify jadi satu baris):
+   <nav class="breadcrumb-nav" aria-label="breadcrumb"><ol class="breadcrumb"><li><a href="${homepageBase}/">🏠 Beranda</a></li>${hasParent ? `<li class="breadcrumb-separator" aria-hidden="true">›</li><li><a href="${parentUrl}">${parentVisual}</a></li>` : ""}<li class="breadcrumb-separator" aria-hidden="true">›</li><li class="active" aria-current="page">${h1Title}</li></ol></nav>
+
+   BAGIAN C — JSON-LD satu <script>, satu @context di root, @graph berisi 3 schema (minify jadi satu baris):
    {
      "@context": "https://schema.org",
-     "@type": "Article",
-     "headline": "${h1Title}",
-     "image": "${homepageBase}/wp-content/uploads/${articleSlug}.webp",
-     "datePublished": "2025-01-15T08:00:00+07:00",
-     "dateModified": "2025-01-15T08:00:00+07:00",
-     "description": "[Meta Description]",
-     "author": {
-       "@type": "Organization",
-       "@id": "${homepageBase}/#organization",
-       "name": "${brandName}",
-       "url": "${homepageBase}"
-     },
-     "publisher": {
-       "@type": "Organization",
-       "@id": "${homepageBase}/#organization",
-       "name": "${brandName}",
-       "url": "${homepageBase}"
-     }
-   }
-   Gunakan struktur FAQPage berikut di dalam @graph (minimal 5 FAQ, sinkron dengan FAQ di konten):
-   {
-     "@context": "https://schema.org",
-     "@type": "FAQPage",
-     "mainEntity": [
+     "@graph": [
        {
-         "@type": "Question",
-         "name": "[Pertanyaan 1]",
-         "acceptedAnswer": {
-           "@type": "Answer",
-           "text": "[Jawaban 1]"
-         }
+         "@type": "BreadcrumbList",
+         "itemListElement": [
+           { "@type": "ListItem", "position": 1, "name": "Beranda", "item": "${homepageBase}/" }${hasParent ? `,
+           { "@type": "ListItem", "position": 2, "name": "${parentVisual}", "item": "${parentUrl}" },
+           { "@type": "ListItem", "position": 3, "name": "${h1Title}", "item": "${targetUrl}" }` : `,
+           { "@type": "ListItem", "position": 2, "name": "${h1Title}", "item": "${targetUrl}" }`}
+         ]
        },
        {
-         "@type": "Question",
-         "name": "[Pertanyaan 2]",
-         "acceptedAnswer": {
-           "@type": "Answer",
-           "text": "[Jawaban 2]"
-         }
+         "@type": "Article",
+         "headline": "${h1Title}",
+         "image": "${homepageBase}/wp-content/uploads/${articleSlug}.webp",
+         "datePublished": "${isoDate}",
+         "dateModified": "${isoDate}",
+         "description": "[isi Meta Description yang dihasilkan]",
+         "author": { "@type": "Organization", "@id": "${homepageBase}/#organization", "name": "${brandName}", "url": "${homepageBase}" },
+         "publisher": { "@type": "Organization", "@id": "${homepageBase}/#organization", "name": "${brandName}", "url": "${homepageBase}" }
        },
        {
-         "@type": "Question",
-         "name": "[Pertanyaan 3]",
-         "acceptedAnswer": {
-           "@type": "Answer",
-           "text": "[Jawaban 3]"
-         }
-       },
-       {
-         "@type": "Question",
-         "name": "[Pertanyaan 4]",
-         "acceptedAnswer": {
-           "@type": "Answer",
-           "text": "[Jawaban 4]"
-         }
-       },
-       {
-         "@type": "Question",
-         "name": "[Pertanyaan 5]",
-         "acceptedAnswer": {
-           "@type": "Answer",
-           "text": "[Jawaban 5]"
-         }
+         "@type": "FAQPage",
+         "mainEntity": [
+           { "@type": "Question", "name": "[Pertanyaan 1]", "acceptedAnswer": { "@type": "Answer", "text": "[Jawaban 1]" } },
+           { "@type": "Question", "name": "[Pertanyaan 2]", "acceptedAnswer": { "@type": "Answer", "text": "[Jawaban 2]" } },
+           { "@type": "Question", "name": "[Pertanyaan 3]", "acceptedAnswer": { "@type": "Answer", "text": "[Jawaban 3]" } },
+           { "@type": "Question", "name": "[Pertanyaan 4]", "acceptedAnswer": { "@type": "Answer", "text": "[Jawaban 4]" } },
+           { "@type": "Question", "name": "[Pertanyaan 5]", "acceptedAnswer": { "@type": "Answer", "text": "[Jawaban 5]" } }
+         ]
        }
      ]
    }
+
+   PENTING — WAJIB DIIKUTI:
+   - Kolom breadcrumb_html TIDAK BOLEH KOSONG. Ini kolom kritikal untuk import WordPress.
+   - Output harus berupa SATU BARIS tunggal — gabungkan Bagian A + B + C tanpa newline, tanpa line break, tanpa spasi ganda.
+   - Minify semua bagian menjadi satu string panjang yang bisa ditempel langsung ke satu cell spreadsheet.
+   - FAQPage di dalam @graph wajib sinkron dengan FAQ yang ada di kolom KONTEN.
+   - Jika konten terlalu panjang, tetap wajib diisi — jangan kosongkan dengan alasan apapun.
 6) JUDUL ARTIKEL: H1 halaman, tidak dimasukkan ke kolom KONTEN
 7) KONTEN: wajib HTML, tanpa <h1>, mulai dari <p>, gunakan <h2>/<h3>/<h4>, <ul><li>, <table>, <blockquote>, dan link <a href="URL">anchor</a>
 8) IMAGE URL: path relatif /[slug].webp
@@ -375,23 +318,11 @@ LARANGAN:
 - Jangan masukkan schema di kolom KONTEN
 - Jangan pakai internal link lebih dari 10 tautan di kolom KONTEN
 
-PLACEHOLDER INPUT:
-Judul H1: ${h1Title}
-Fokus Keyword: ${focusKeyword}
-Tipe Konten: ${contentType}
-Target URL: ${targetUrl}
-Jumlah Kata: ${wordCount}
-Homepage URL: ${resolvedHomepageUrl}
-Gaya tone tulisan: ${tone}
-Nama Brand: ${brandName}
-Niche / Industri: ${niche}
-Konten Homepage: ${homepageContent}
-
 BREADCRUMB:
 ${breadcrumbText}
-URL PARENT 1 = ${parentUrl}
+${hasParent ? `URL PARENT 1 = ${parentUrl}
 PARENT 1 VISUAL = ${parentVisual}
-JUDUL H1 (otomatis dari h1) = ${h1Title}
+` : ""}JUDUL H1 = ${h1Title}
 Contoh output: ${breadcrumbText}`;
 };
 
@@ -416,25 +347,19 @@ export default function App() {
   const homepageUrl = useMemo(() => detectHomepageUrl(form.targetUrl), [form.targetUrl]);
 
   const breadcrumbPreview = useMemo(() => {
-    const parent = form.parentVisual.trim() || "(Parent 1 Visual)";
+    const parent = form.parentVisual.trim();
     const title = form.h1Title.trim() || "(Judul H1)";
-    return `Beranda > ${parent} > ${title}`;
+    const isValidParent = parent.length > 0 && parent !== ">";
+    return isValidParent ? `Beranda > ${parent} > ${title}` : `Beranda > ${title}`;
   }, [form.parentVisual, form.h1Title]);
 
   const requiredFieldsFilled = useMemo(() => {
     return Boolean(
-      form.h1Title.trim() &&
-        form.focusKeyword.trim() &&
-        form.contentType.trim() &&
-        form.targetUrl.trim() &&
-        form.wordCount.trim() &&
-        form.tone.trim() &&
-        form.brandName.trim() &&
-        form.niche.trim() &&
-        form.homepageContent.trim() &&
-        form.parentUrl.trim() &&
-        form.parentVisual.trim() &&
-        cleanLinks(form.internalLinks)
+      form.h1Title.trim() && form.focusKeyword.trim() && form.contentType.trim() &&
+      form.targetUrl.trim() && form.wordCount.trim() && form.tone.trim() &&
+      form.brandName.trim() && form.niche.trim() && form.ctaTarget.trim() &&
+      form.homepageContent.trim() &&
+      cleanLinks(form.internalLinks)
     );
   }, [form]);
 
@@ -444,80 +369,53 @@ export default function App() {
     setCopied(false);
   };
 
+  const showNotice = (msg: string) => {
+    setPresetNotice(msg);
+    setTimeout(() => setPresetNotice(""), 3000);
+  };
+
   const savePreset = () => {
     const normalizedName = presetName.trim();
-    if (!normalizedName) {
-      setPresetNotice("Isi nama preset dulu.");
-      return;
-    }
-
+    if (!normalizedName) { showNotice("Isi nama preset dulu."); return; }
     const now = new Date().toISOString();
-
     setPresets((prev) => {
       const existing = prev.find((item) => item.name.toLowerCase() === normalizedName.toLowerCase());
       if (existing) {
         setSelectedPresetId(existing.id);
-        setPresetNotice(`Preset \"${normalizedName}\" berhasil di-update.`);
-        return prev.map((item) =>
-          item.id === existing.id
-            ? { ...item, name: normalizedName, form: { ...form }, updatedAt: now }
-            : item
-        );
+        showNotice(`Preset "${normalizedName}" berhasil di-update.`);
+        return prev.map((item) => item.id === existing.id ? { ...item, name: normalizedName, form: { ...form }, updatedAt: now } : item);
       }
-
-      const newPreset: PresetItem = {
-        id: `preset-${Date.now()}`,
-        name: normalizedName,
-        form: { ...form },
-        updatedAt: now,
-      };
-
+      const newPreset: PresetItem = { id: `preset-${Date.now()}`, name: normalizedName, form: { ...form }, updatedAt: now };
       setSelectedPresetId(newPreset.id);
-      setPresetNotice(`Preset \"${normalizedName}\" berhasil disimpan.`);
+      showNotice(`Preset "${normalizedName}" berhasil disimpan.`);
       return [newPreset, ...prev];
     });
   };
 
   const loadPresetById = () => {
-    if (!selectedPresetId) {
-      setPresetNotice("Pilih preset yang ingin di-load.");
-      return;
-    }
-
+    if (!selectedPresetId) { showNotice("Pilih preset yang ingin di-load."); return; }
     const selected = presets.find((item) => item.id === selectedPresetId);
-    if (!selected) {
-      setPresetNotice("Preset tidak ditemukan.");
-      return;
-    }
-
+    if (!selected) { showNotice("Preset tidak ditemukan."); return; }
     setForm({ ...initialForm, ...selected.form });
     setGeneratedPrompt("");
     setCopied(false);
     setPresetName(selected.name);
-    setPresetNotice(`Preset \"${selected.name}\" berhasil di-load.`);
+    showNotice(`Preset "${selected.name}" berhasil di-load.`);
   };
 
   const deletePresetById = () => {
-    if (!selectedPresetId) {
-      setPresetNotice("Pilih preset yang ingin dihapus.");
-      return;
-    }
-
+    if (!selectedPresetId) { showNotice("Pilih preset yang ingin dihapus."); return; }
     const selected = presets.find((item) => item.id === selectedPresetId);
-    if (!selected) {
-      setPresetNotice("Preset tidak ditemukan.");
-      return;
-    }
-
+    if (!selected) { showNotice("Preset tidak ditemukan."); return; }
+    if (!window.confirm(`Hapus preset "${selected.name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
     setPresets((prev) => prev.filter((item) => item.id !== selectedPresetId));
     setSelectedPresetId("");
-    if (presetName.trim().toLowerCase() === selected.name.toLowerCase()) {
-      setPresetName("");
-    }
-    setPresetNotice(`Preset \"${selected.name}\" berhasil dihapus.`);
+    if (presetName.trim().toLowerCase() === selected.name.toLowerCase()) setPresetName("");
+    showNotice(`Preset "${selected.name}" berhasil dihapus.`);
   };
 
   const resetToPlaceholder = () => {
+    if (!window.confirm("Reset semua field ke kondisi awal? Data yang belum disimpan sebagai preset akan hilang.")) return;
     setForm(initialForm);
     setGeneratedPrompt("");
     setCopied(false);
@@ -525,27 +423,19 @@ export default function App() {
   };
 
   const handleGenerate = () => {
-    if (!requiredFieldsFilled) {
-      return;
-    }
-    const prompt = buildPrompt(form, homepageUrl);
-    setGeneratedPrompt(prompt);
+    if (!requiredFieldsFilled) return;
+    setGeneratedPrompt(buildPrompt(form, homepageUrl));
     setCopied(false);
   };
 
   const copyPrompt = async () => {
-    if (!generatedPrompt) {
-      return;
-    }
+    if (!generatedPrompt) return;
     await navigator.clipboard.writeText(generatedPrompt);
     setCopied(true);
   };
 
   const downloadPrompt = () => {
-    if (!generatedPrompt) {
-      return;
-    }
-
+    if (!generatedPrompt) return;
     const fileName = `${createSlug(form.h1Title || form.focusKeyword)}.txt`;
     const blob = new Blob([generatedPrompt], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -574,71 +464,28 @@ export default function App() {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-2 text-sm">
                 <span>Judul H1</span>
-                <input
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
-                  value={form.h1Title}
-                  onChange={(event) => updateField("h1Title", event.target.value)}
-                  placeholder="Contoh: Jasa Pasang CCTV Jakarta"
-                />
+                <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400" value={form.h1Title} onChange={(e) => updateField("h1Title", e.target.value)} placeholder="Contoh: Jasa Pasang CCTV Jakarta" />
               </label>
               <label className="space-y-2 text-sm">
                 <span>Fokus Keyword</span>
-                <input
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
-                  value={form.focusKeyword}
-                  onChange={(event) => updateField("focusKeyword", event.target.value)}
-                  placeholder="Contoh: pasang cctv jakarta"
-                />
+                <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400" value={form.focusKeyword} onChange={(e) => updateField("focusKeyword", e.target.value)} placeholder="Contoh: pasang cctv jakarta" />
               </label>
             </div>
 
             <div className="space-y-3 rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
               <p className="text-sm font-medium text-zinc-100">Preset Website</p>
-              <p className="text-xs text-zinc-400">
-                Simpan konfigurasi per website, lalu load kapan saja saat pindah project.
-              </p>
+              <p className="text-xs text-zinc-400">Simpan konfigurasi per website, lalu load kapan saja saat pindah project.</p>
               <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                <input
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400"
-                  value={presetName}
-                  onChange={(event) => setPresetName(event.target.value)}
-                  placeholder="Contoh: Website A - CCTVGO"
-                />
-                <button
-                  type="button"
-                  onClick={savePreset}
-                  className="rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-violet-400"
-                >
-                  Save Preset
-                </button>
+                <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400" value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Contoh: Website A - CCTVGO" />
+                <button type="button" onClick={savePreset} className="rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-violet-400">Save Preset</button>
               </div>
               <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
-                <select
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400"
-                  value={selectedPresetId}
-                  onChange={(event) => setSelectedPresetId(event.target.value)}
-                >
+                <select className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400" value={selectedPresetId} onChange={(e) => setSelectedPresetId(e.target.value)}>
                   <option value="">Pilih preset tersimpan</option>
-                  {presets.map((preset) => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.name}
-                    </option>
-                  ))}
+                  {presets.map((preset) => (<option key={preset.id} value={preset.id}>{preset.name}</option>))}
                 </select>
-                <button
-                  type="button"
-                  onClick={loadPresetById}
-                  className="rounded-md border border-emerald-500/60 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:border-emerald-400"
-                >
-                  Load Preset
-                </button>
-                <button
-                  type="button"
-                  onClick={deletePresetById}
-                  className="rounded-md border border-rose-500/60 px-4 py-2 text-sm font-medium text-rose-200 transition hover:border-rose-400"
-                >
-                  Hapus
-                </button>
+                <button type="button" onClick={loadPresetById} className="rounded-md border border-emerald-500/60 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:border-emerald-400">Load Preset</button>
+                <button type="button" onClick={deletePresetById} className="rounded-md border border-rose-500/60 px-4 py-2 text-sm font-medium text-rose-200 transition hover:border-rose-400">Hapus</button>
               </div>
               {presetNotice && <p className="text-xs text-zinc-300">{presetNotice}</p>}
             </div>
@@ -647,16 +494,8 @@ export default function App() {
               <p>Tipe Konten</p>
               <div className="flex flex-wrap gap-2">
                 {CONTENT_TYPES.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => updateField("contentType", option)}
-                    className={`rounded-md border px-3 py-1.5 text-sm transition ${
-                      form.contentType === option
-                        ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
-                        : "border-zinc-700 bg-zinc-900 text-zinc-200 hover:border-zinc-500"
-                    }`}
-                  >
+                  <button key={option} type="button" onClick={() => updateField("contentType", option)}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition ${form.contentType === option ? "border-cyan-400 bg-cyan-500/20 text-cyan-200" : "border-zinc-700 bg-zinc-900 text-zinc-200 hover:border-zinc-500"}`}>
                     {option}
                   </button>
                 ))}
@@ -667,16 +506,8 @@ export default function App() {
               <p>Jumlah Kata (klik pilih)</p>
               <div className="flex flex-wrap gap-2">
                 {WORD_COUNT_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => updateField("wordCount", option)}
-                    className={`rounded-md border px-3 py-1.5 text-sm transition ${
-                      form.wordCount === option
-                        ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
-                        : "border-zinc-700 bg-zinc-900 text-zinc-200 hover:border-zinc-500"
-                    }`}
-                  >
+                  <button key={option} type="button" onClick={() => updateField("wordCount", option)}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition ${form.wordCount === option ? "border-cyan-400 bg-cyan-500/20 text-cyan-200" : "border-zinc-700 bg-zinc-900 text-zinc-200 hover:border-zinc-500"}`}>
                     {option}
                   </button>
                 ))}
@@ -687,162 +518,100 @@ export default function App() {
               <p>Gaya Tone Tulisan (klik pilih)</p>
               <div className="flex flex-wrap gap-2">
                 {TONE_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => updateField("tone", option)}
+                  <button key={option} type="button" onClick={() => updateField("tone", option)}
                     className={`rounded-md border px-3 py-1.5 text-sm transition ${
                       form.tone === option
-                        ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
+                        ? option === "Conversational Yet Authoritative"
+                          ? "border-amber-400 bg-amber-500/20 text-amber-200"
+                          : "border-cyan-400 bg-cyan-500/20 text-cyan-200"
                         : "border-zinc-700 bg-zinc-900 text-zinc-200 hover:border-zinc-500"
-                    }`}
-                  >
+                    }`}>
                     {option}
+                    {option === "Conversational Yet Authoritative" && " ✨"}
                   </button>
                 ))}
               </div>
+              {form.tone === "Conversational Yet Authoritative" && (
+                <p className="mt-1 text-xs text-amber-300/80">
+                  ✨ Mode ini menyisipkan aturan ritme khusus ke dalam prompt — kalimat pendek-panjang bergantian, tone akrab tapi dipercaya.
+                </p>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-2 text-sm">
                 <span>Target URL</span>
-                <input
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
-                  value={form.targetUrl}
-                  onChange={(event) => updateField("targetUrl", event.target.value)}
-                  placeholder="https://cctvgo.id/jasa-pasang-cctv-jakarta/"
-                />
+                <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400" value={form.targetUrl} onChange={(e) => updateField("targetUrl", e.target.value)} placeholder="https://cctvgo.id/jasa-pasang-cctv-jakarta/" />
               </label>
               <label className="space-y-2 text-sm">
                 <span>Homepage URL (auto detect dari Target URL)</span>
-                <input
-                  className="w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-zinc-300"
-                  value={homepageUrl || "(otomatis muncul setelah Target URL valid)"}
-                  readOnly
-                />
+                <input className="w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-zinc-300" value={homepageUrl || "(otomatis muncul setelah Target URL valid)"} readOnly />
               </label>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-2 text-sm">
                 <span>Nama Brand</span>
-                <input
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
-                  value={form.brandName}
-                  onChange={(event) => updateField("brandName", event.target.value)}
-                  placeholder="Nama Bisnis / Brand"
-                />
+                <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400" value={form.brandName} onChange={(e) => updateField("brandName", e.target.value)} placeholder="Nama Bisnis / Brand" />
               </label>
               <label className="space-y-2 text-sm">
                 <span>Niche / Industri</span>
-                <input
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
-                  value={form.niche}
-                  onChange={(event) => updateField("niche", event.target.value)}
-                  placeholder="Contoh: Keamanan, CCTV, IT"
-                />
+                <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400" value={form.niche} onChange={(e) => updateField("niche", e.target.value)} placeholder="Contoh: Keamanan, CCTV, IT" />
               </label>
             </div>
+
+            <label className="block space-y-2 text-sm">
+              <span>CTA Target <span className="text-zinc-400">(nomor WhatsApp atau URL tujuan CTA)</span></span>
+              <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400" value={form.ctaTarget} onChange={(e) => updateField("ctaTarget", e.target.value)} placeholder="Contoh: https://wa.me/6281234567890 atau https://domain.com/kontak/" />
+            </label>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-2 text-sm">
                 <span>URL Parent 1</span>
-                <input
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
-                  value={form.parentUrl}
-                  onChange={(event) => updateField("parentUrl", event.target.value)}
-                  placeholder="https://client-web.com/category/"
-                />
+                <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400" value={form.parentUrl} onChange={(e) => updateField("parentUrl", e.target.value)} placeholder="https://client-web.com/category/" />
               </label>
               <label className="space-y-2 text-sm">
                 <span>Parent 1 Visual</span>
-                <input
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400"
-                  value={form.parentVisual}
-                  onChange={(event) => updateField("parentVisual", event.target.value)}
-                  placeholder="Contoh: Area Layanan"
-                />
+                <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none transition focus:border-cyan-400" value={form.parentVisual} onChange={(e) => updateField("parentVisual", e.target.value)} placeholder="Contoh: Area Layanan" />
               </label>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm">Preview Breadcrumb (Bisa diedit manual)</p>
-              <input
-                className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-cyan-200 outline-none transition focus:border-cyan-400"
-                value={form.breadcrumbOverride || breadcrumbPreview}
-                onChange={(event) => updateField("breadcrumbOverride", event.target.value)}
-                placeholder={breadcrumbPreview}
-              />
+              <input className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-cyan-200 outline-none transition focus:border-cyan-400" value={form.breadcrumbOverride || breadcrumbPreview} onChange={(e) => updateField("breadcrumbOverride", e.target.value)} placeholder={breadcrumbPreview} />
             </div>
 
             <label className="block space-y-2 text-sm">
               <span>Konten Homepage untuk Analisis</span>
-              <textarea
-                className="min-h-56 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400"
-                value={form.homepageContent}
-                onChange={(event) => updateField("homepageContent", event.target.value)}
-                placeholder="Paste konten halaman utama atau konteks bisnis di sini..."
-              />
+              <textarea className="min-h-56 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400" value={form.homepageContent} onChange={(e) => updateField("homepageContent", e.target.value)} placeholder="Paste konten halaman utama atau konteks bisnis di sini..." />
             </label>
 
             <label className="block space-y-2 text-sm">
               <span>Daftar Internal Link (1 URL per baris)</span>
-              <textarea
-                className="min-h-44 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400"
-                value={form.internalLinks}
-                onChange={(event) => updateField("internalLinks", event.target.value)}
-              />
+              <textarea className="min-h-44 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none transition focus:border-cyan-400" value={form.internalLinks} onChange={(e) => updateField("internalLinks", e.target.value)} />
             </label>
 
             <div className="flex flex-wrap gap-3">
               {requiredFieldsFilled ? (
-                <button
-                  type="button"
-                  onClick={handleGenerate}
-                  className="rounded-md bg-cyan-500 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-cyan-400"
-                >
-                  Generate Artikel
-                </button>
+                <button type="button" onClick={handleGenerate} className="rounded-md bg-cyan-500 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-cyan-400">Generate Artikel</button>
               ) : (
                 <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
                   Lengkapi semua field wajib untuk menampilkan tombol Generate Artikel.
                 </div>
               )}
-
-              <button
-                type="button"
-                onClick={resetToPlaceholder}
-                className="rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-400"
-              >
-                Reset Form
-              </button>
+              <button type="button" onClick={resetToPlaceholder} className="rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-400">Reset Form</button>
             </div>
           </form>
 
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Output Prompt</h2>
-            <textarea
-              readOnly
-              value={generatedPrompt || "Klik Generate Artikel setelah semua field lengkap."}
-              className="min-h-[900px] w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm leading-relaxed text-zinc-100"
-            />
-
+            <textarea readOnly value={generatedPrompt || "Klik Generate Artikel setelah semua field lengkap."} className="min-h-[900px] w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm leading-relaxed text-zinc-100" />
             {generatedPrompt && (
               <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={copyPrompt}
-                  className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-emerald-400"
-                >
+                <button type="button" onClick={copyPrompt} className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-emerald-400">
                   {copied ? "Prompt berhasil disalin" : "Copy Prompt"}
                 </button>
-                <button
-                  type="button"
-                  onClick={downloadPrompt}
-                  className="rounded-md border border-zinc-500 px-4 py-2 text-sm font-medium text-zinc-100 transition hover:border-zinc-300"
-                >
-                  Download .txt
-                </button>
+                <button type="button" onClick={downloadPrompt} className="rounded-md border border-zinc-500 px-4 py-2 text-sm font-medium text-zinc-100 transition hover:border-zinc-300">Download .txt</button>
               </div>
             )}
           </section>
